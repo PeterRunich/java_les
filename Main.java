@@ -1,90 +1,65 @@
 package com.company;
+import java.util.Scanner;
+import java.util.regex.Pattern;
 
 public class Main {
     public static void main(String[] args) {
-        BabushkaPhone babushkaPhone = new BabushkaPhone(2342432, "Nokia", "300" ,"2003", 12, 5000);
-        SmartPhone smartPhone = new SmartPhone(123561, "Apple", "300", "2240x1440", 4, true);
-
-        babushkaPhone.receiveCall("Ivan");
-        System.out.println(babushkaPhone.getPrice());
-        babushkaPhone.getInfo();
-        System.out.println(babushkaPhone.getNumber());
-
-        smartPhone.sendMessage("hi");
-        System.out.println(smartPhone.getScreenResolution());
-        smartPhone.getInfo();
-        System.out.println(smartPhone.getNumber());
-        smartPhone.receiveCall("Plaza");
+        Auth auth = new Auth();
+        auth.fillLogin();
     }
 }
 
-class Phone {
-    private int serialNumber;
-    private String model;
-    private String weight;
+class Auth {
+    private String login;
 
-    Phone(int serialNumber, String model, String weight) {
-        this.serialNumber = serialNumber;
-        this.model = model;
-        this.weight = weight;
+    public void fillLogin() {
+        Scanner scanner = new Scanner(System.in);
+
+        do {
+            System.out.print("Введите email или телефон: ");
+            login = scanner.nextLine();
+        } while(!isLoginValid());
+
+        Coder backend = new Coder();
+        backend.sendCode();
+
+        System.out.print("Введите code: ");
+        int code = scanner.nextInt();
+
+        if (backend.checkCode(code)) {
+            System.out.println("Удачно");
+        } else {
+            System.out.println("Неверный");
+        }
     }
 
-    Phone(int serialNumber, String model) {
-        this.serialNumber = serialNumber;
-        this.model = model;
+    private boolean isLoginValid() {
+        return isEmailValid() || isPhoneValid();
     }
 
-    public void getInfo() {
-        System.out.println("serialNumber: " + serialNumber + " model: " + model + " weight: " + weight);
+    private boolean isPhoneValid() {
+        return Pattern.compile("^((8|\\+7)[\\- ]?)?(\\(?\\d{3}\\)?[\\- ]?)?[\\d\\- ]{7,10}$")
+                .matcher(login)
+                .matches();
     }
 
-    public int getNumber() {
-        return this.serialNumber;
-    }
-
-    public void receiveCall(String name) {
-        System.out.println("receiveCall: " + name);
-    }
-}
-
-class BabushkaPhone extends Phone {
-    private String productionYear;
-    private int buttonCount;
-    private int price;
-
-    BabushkaPhone(int serialNumber, String model, String weight, String productionYear, int buttonCount, int price) {
-        super(serialNumber, model, weight);
-        this.productionYear =productionYear;
-        this.buttonCount = buttonCount;
-        this.price = price;
-    }
-
-    public void receiveCall(String name) {
-        System.out.println("BabushkaPhone receiveCall: " + name);
-    }
-
-    public int getPrice() {
-        return this.price;
+    private boolean isEmailValid() {
+        return Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$", Pattern.CASE_INSENSITIVE)
+                .matcher(login)
+                .matches();
     }
 }
 
-class SmartPhone extends Phone {
-    private String screenResolution;
-    private int camerasCount;
-    private boolean touchId;
+class Coder {
+    private int code;
 
-    public void sendMessage(String message) {
-        System.out.println("sendMessage: " + message);
+    public void sendCode() {
+        code = 111_111 + (int)(Math.random() * ((999_999 - 111_111) + 1));
+
+        System.out.println("Отправлен код " + code);
     }
 
-    SmartPhone(int serialNumber, String model, String weight, String screenResolution, int camerasCount, boolean touchId) {
-        super(serialNumber, model, weight);
-        this.screenResolution = screenResolution;
-        this.camerasCount = camerasCount;
-        this.touchId = touchId;
-    }
-
-    public String getScreenResolution() {
-        return this.screenResolution;
+    public boolean checkCode(int userCode) {
+        return code == userCode;
     }
 }
