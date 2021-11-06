@@ -1,167 +1,194 @@
 package com.company;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.Scanner;
-import java.util.regex.Pattern;
-import java.security.*;
 
+//тут не трогай
+interface ImageOperation {
+    int execute(int rgb) throws Exception;
+}
+
+//и тут не трогай
+interface ImageIteratorCallback {
+    void callback(int rgb);
+}
+
+//а этот класс особенно не трогай. Трогать можно экземпляр этого класса
+class RgbMaster {
+    public boolean hasAlphaChannel;
+    private BufferedImage image;
+    private int width;
+    private int height;
+    private int[] colors;
+
+    RgbMaster(String path) throws IOException {
+        //Делаем объект ImageIO для использования API ввода / вывода изображения.
+        image = ImageIO.read(new File(path));
+        //Получаем ширину.
+        width = image.getWidth();
+        //Получаем высоту.
+        height = image.getHeight();
+        //Получаем массив integer пикселей RGB.
+        colors = image.getRGB(0, 0, width, height, null, 0, width * height);
+        //Есть ли прозрачность.
+        hasAlphaChannel = image.getAlphaRaster() != null;
+    }
+
+    static float[] rgbIntToArray(int rgbInt) {
+        Color color = new Color(rgbInt);
+        return color.getRGBComponents(null); // Получаем массив из цветового int. Вида: [red, green, blue, alpha].
+    }
+
+    static int rgbArrayToInt(float[] rgbArray) throws Exception {
+        //Получаем цвет в виде int из массива [r,g,b] или [r,g,b,a].
+        if (rgbArray.length == 3) {
+            return new Color(rgbArray[0], rgbArray[1], rgbArray[2]).getRGB();
+        } else if (rgbArray.length == 4) {
+            return new Color(rgbArray[0], rgbArray[1], rgbArray[2], rgbArray[3]).getRGB();
+        } else {
+            throw new Exception("invalid color");
+        }
+    }
+
+    void changeImage(ImageOperation operation) throws Exception {
+        //Проходимся по всем пикселям в картинке и переопределяем значением которое вернула lambda.
+        for (int i = 0; i < colors.length; i++) {
+            colors[i] = operation.execute(colors[i]);
+        }
+    }
+
+    void iterateInImage(ImageIteratorCallback operation) {
+        //Проходимся по всем пикселям в картинке и вызываем lambd-у с аргументов в виде цвета(int).
+        for (int i = 0; i < colors.length; i++) {
+            operation.callback(colors[i]);
+        }
+    }
+
+    void save(String fileName) throws IOException {
+        //Проверяем тип с прозрачностью ли картинка, создаём объект который будет хранить картинку и в итоге сохранит её.
+        int type = hasAlphaChannel ? BufferedImage.TYPE_INT_ARGB: BufferedImage.TYPE_INT_RGB;
+        image = new BufferedImage(width, height, type);
+        image.setRGB(0, 0, width, height, colors, 0, width * height);
+        ImageIO.write(image, "png", new File(fileName));
+    }
+}
+
+//TODO: Тебе нужно реализовать реализацию этого класса ImageFunctionsImpl.
+//И уже эту реализацию использовать как лямбды
+abstract class ImageFunctions {
+    HashMap<Integer, Integer> frequency = new HashMap<>(); //<color, count>
+
+    abstract int greyScale(int color) throws Exception;
+
+    abstract int sepia(int color) throws Exception;
+
+    abstract int inversion(int color) throws Exception;
+
+    abstract int onlyRed(int color) throws Exception;
+
+    abstract int onlyGreen(int color) throws Exception;
+
+    abstract int onlyBlue(int color) throws Exception;
+
+    abstract void fft(int color); //fill frequency map
+}
+
+class ImageFunctionsImpl extends ImageFunctions {
+    @Override
+    int greyScale(int color) throws Exception {
+        //Press f to pay respect.
+        float[] pixel = RgbMaster.rgbIntToArray(color);
+        float avg = (pixel[0] + pixel[1] + pixel[2]) / 3;
+
+        return RgbMaster.rgbArrayToInt(new float[] {avg, avg, avg, pixel[3]});
+    }
+
+    @Override
+    int sepia(int color) throws Exception {
+        //(Кастуем) магические заклинания с магическими цифрами.
+        float[] pixel = RgbMaster.rgbIntToArray(color);
+        float[] newPixel = new float[4];
+        float tone = (float) (.299 * pixel[0] + .587 * pixel[1] + .114 * pixel[2]);
+
+        newPixel[0] = (float) ((tone > .8078) ? 1 : tone + .1922);
+        newPixel[1] = (float) ((tone < .0549) ? 0 : tone - .0549);
+        newPixel[2] = (float) ((tone < .2196) ? 0 : tone - .2196);
+
+        newPixel[3] = pixel[3];
+
+        return RgbMaster.rgbArrayToInt(newPixel);
+    }
+
+    @Override
+    int inversion(int color) throws Exception {
+        //Что же мы тут делаем ...
+        float[] pixel = RgbMaster.rgbIntToArray(color);
+
+        pixel[0] = 1 - pixel[0];
+        pixel[1] = 1 - pixel[1];
+        pixel[2] = 1 - pixel[2];
+
+        return RgbMaster.rgbArrayToInt(pixel);
+    }
+
+    @Override
+    int onlyRed(int color) throws Exception {
+        //Обнуляем зелёный и синий.
+        float[] pixel = RgbMaster.rgbIntToArray(color);
+
+        pixel[1] = 0;
+        pixel[2] = 0;
+        return RgbMaster.rgbArrayToInt(pixel);
+    }
+
+    @Override
+    int onlyGreen(int color) throws Exception {
+        //Обнуляем красбный и синий.
+        float[] pixel = RgbMaster.rgbIntToArray(color);
+
+        pixel[0] = 0;
+        pixel[2] = 0;
+        return RgbMaster.rgbArrayToInt(pixel);
+    }
+
+    @Override
+    int onlyBlue(int color) throws Exception {
+        //Обнуляем красбный и зелёный.
+        float[] pixel = RgbMaster.rgbIntToArray(color);
+
+        pixel[0] = 0;
+        pixel[1] = 0;
+
+        return RgbMaster.rgbArrayToInt(pixel);
+    }
+
+    @Override
+    void fft(int color) {
+        //Делаем инкремент в мапе.
+        frequency.merge(color, 1, Integer::sum);
+    }
+}
+
+/* one eternity later*/
+/* 75 years later*/
 public class Main {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        Auth auth = new AuthImpl();
+    public static void main(String[] args) throws Exception {
+        RgbMaster rbgMaster = new RgbMaster("in_image.png");
+        ImageFunctionsImpl imageFunc = new ImageFunctionsImpl();
 
-        System.out.println("Введи 0 если хочешь зарегистрироваться, 1 если войти.");
-        int num = scanner.nextInt();
+        rbgMaster.changeImage(imageFunc::onlyRed);
+//        rbgMaster.changeImage(imageFunc::onlyBlue);
+//        rbgMaster.changeImage(imageFunc::onlyGreen);
+//        rbgMaster.changeImage(imageFunc::greyScale);
+//        rbgMaster.changeImage(imageFunc::sepia);
+//        rbgMaster.changeImage(imageFunc::inversion);
+        rbgMaster.save("out_image.png");
 
-        System.out.println("Логин (email): ");
-        String login = scanner.next();
-        System.out.println("Пароль: ");
-        String password = scanner.next();
-
-        if (num == 0) {
-            auth.register(login, password);
-        }
-
-        if (num == 1) {
-            auth.login(login, password);
-        }
-    }
-}
-
-abstract class Server {
-    abstract boolean register(String login, String password);
-
-    abstract boolean login(String login, String password);
-
-    abstract void dropDataBase();
-}
-
-abstract class Auth {
-    abstract void register(String login, String password);
-
-    abstract void login(String login, String password);
-}
-
-class AuthImpl extends Auth {
-
-    @Override
-    void register(String login, String password) {
-        System.out.printf("Register %b: %s", ServerImpl.getInstance().register(login, password), login);
-    }
-
-    @Override
-    void login(String login, String password) {
-        System.out.printf("Login %b: %s", ServerImpl.getInstance().login(login, password), login);
-    }
-}
-
-class ServerImpl extends Server {
-    private static Server _instance = null;
-    private final String DB_PATH = "./database.json";
-    private HashMap<String, String> db = new HashMap<>();
-
-    public static Server getInstance() {
-        if (_instance == null)
-            _instance = new ServerImpl();
-        return _instance;
-    }
-
-    ServerImpl() {
-        if (initDb())
-            load_db_scheme();
-
-        load_db_from_file();
-    }
-
-    private boolean initDb() {
-        File file = new File(DB_PATH);
-
-        if (file.exists()) return false;
-
-        try { file.createNewFile(); }
-        catch(IOException e) {}
-        return true;
-    }
-
-    private void load_db_scheme() {
-        try {
-            FileWriter writer = new FileWriter(DB_PATH);
-            writer.write("{}");
-            writer.flush();
-        }
-        catch (IOException e) {}
-    }
-
-    private void load_db_from_file() {
-        try {
-            Gson gson = new Gson();
-            Reader reader = Files.newBufferedReader(Path.of(DB_PATH));
-
-            db = gson.fromJson(reader, db.getClass());
-
-            reader.close();
-        }
-        catch (IOException e) {}
-    }
-
-    private void syncDb() {
-        try (Writer writer = new FileWriter(DB_PATH)){
-            Gson gson = new GsonBuilder().create();
-            gson.toJson(db, writer);
-        }
-        catch(IOException e) {}
-    }
-
-    private boolean isEmailValid(String login) {
-        return Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$", Pattern.CASE_INSENSITIVE)
-                .matcher(login)
-                .matches();
-    }
-
-    @Override
-    boolean register(String login, String password) {
-         if (db.get(login) != null) return false;
-         if (!isEmailValid(login)) return false;
-
-         db.put(login, toMd5(password));
-         syncDb();
-
-         return true;
-    }
-
-    private String toMd5(String str) {
-        String hashedString = "";
-
-        try {
-            byte[] bytesOfMessage = str.getBytes("UTF-8");
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] theMD5digest = md.digest(bytesOfMessage);
-            hashedString = new String(theMD5digest, StandardCharsets.UTF_8);
-        } catch (IOException | NoSuchAlgorithmException e) {}
-
-        return hashedString;
-    }
-
-    @Override
-    boolean login(String login, String password) {
-        if (db.get(login) == null) return false;
-        if (!db.get(login).equals(toMd5(password))) return false;
-
-        return true;
-    }
-
-    @Override
-    void dropDataBase() {
-        try {
-            Files.delete(Paths.get(DB_PATH));
-        } catch (IOException e) {}
+//        rbgMaster.iterateInImage(imageFunc::fft);
+//        System.out.println(imageFunc.frequency);
     }
 }
