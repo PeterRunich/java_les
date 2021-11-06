@@ -147,7 +147,7 @@ class ImageFunctionsImpl extends ImageFunctions {
 
     @Override
     int onlyGreen(int color) throws Exception {
-        //Обнуляем красбный и синий.
+        //Обнуляем красный и синий.
         float[] pixel = RgbMaster.rgbIntToArray(color);
 
         pixel[0] = 0;
@@ -157,7 +157,7 @@ class ImageFunctionsImpl extends ImageFunctions {
 
     @Override
     int onlyBlue(int color) throws Exception {
-        //Обнуляем красбный и зелёный.
+        //Обнуляем красный и зелёный.
         float[] pixel = RgbMaster.rgbIntToArray(color);
 
         pixel[0] = 0;
